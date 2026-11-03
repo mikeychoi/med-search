@@ -1,6 +1,6 @@
 // TEMPORARY demonstration data for previewing UI components. Not a substitute for the RxNorm service.
 // To remove the demo: delete the src/mocks/ folder, then delete the two lines marked `DEMO`
-// in SearchPage.tsx and in ListsPage.tsx (the import and the component).
+// in ListsPage.tsx (the import and the component).
 // Concepts are real RxNorm entries (verified 2026-11-03).
 import type { Medication, MedicationList } from '../types/medication';
 

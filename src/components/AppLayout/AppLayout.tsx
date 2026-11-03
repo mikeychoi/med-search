@@ -1,53 +1,64 @@
-import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import type { Theme } from '@mui/material/styles';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
-
-const navItems = [
-  { label: 'Search', path: '/' },
-  { label: 'Lists', path: '/lists' },
-];
+import MenuIcon from '@mui/icons-material/Menu';
+import NavSidebar, { NAV_SIDEBAR_ID } from '../NavSidebar/NavSidebar';
 
 function AppLayout() {
-  const { pathname } = useLocation();
-  const activePath = navItems.find((item) => item.path === pathname)?.path ?? false;
+  const isDesktop = useMediaQuery((theme: Theme) => theme.breakpoints.up('md'), { noSsr: true });
+  const [desktopExpanded, setDesktopExpanded] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const sidebarOpen = isDesktop ? desktopExpanded : mobileOpen;
+
+  const toggleSidebar = () => {
+    if (isDesktop) {
+      setDesktopExpanded((expanded) => !expanded);
+    } else {
+      setMobileOpen((open) => !open);
+    }
+  };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="sticky">
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ gap: 2 }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            aria-label="Toggle navigation"
+            aria-controls={NAV_SIDEBAR_ID}
+            aria-expanded={sidebarOpen}
+            onClick={toggleSidebar}
+          >
+            <MenuIcon />
+          </IconButton>
           <LocalPharmacyIcon aria-hidden />
-          <Typography variant="h6" component="span" sx={{ fontWeight: 700, flexGrow: 1 }}>
+          <Typography variant="h6" component="span" sx={{ fontWeight: 700 }}>
             MedSearch
           </Typography>
-          <Tabs
-            component="nav"
-            aria-label="Main navigation"
-            value={activePath}
-            textColor="inherit"
-            slotProps={{ indicator: { sx: { bgcolor: 'common.white' } } }}
-          >
-            {navItems.map((item) => (
-              <Tab
-                key={item.path}
-                label={item.label}
-                value={item.path}
-                component={RouterLink}
-                to={item.path}
-                sx={{ minWidth: { xs: 72, sm: 96 } }}
-              />
-            ))}
-          </Tabs>
         </Toolbar>
       </AppBar>
-      <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, sm: 4 } }}>
-        <Outlet />
-      </Container>
+      <NavSidebar
+        variant={isDesktop ? 'permanent' : 'temporary'}
+        open={sidebarOpen}
+        onClose={() => setMobileOpen(false)}
+      />
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+        {/* Spacer so content starts below the fixed AppBar. */}
+        <Toolbar />
+        <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 4 } }}>
+          <Outlet />
+        </Container>
+      </Box>
     </Box>
   );
 }

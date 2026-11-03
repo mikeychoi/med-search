@@ -23,3 +23,12 @@ export interface MedicationList {
   /** ISO 8601 timestamp. */
   updatedAt: string;
 }
+
+/** User-friendly names for each supported term type. */
+export const RXNORM_TERM_TYPE_LABELS: Record<RxNormTermType, string> = {
+  IN: 'Ingredient',
+  SCD: 'Clinical Drug',
+  SBD: 'Branded Drug',
+  GPCK: 'Clinical Pack',
+  BPCK: 'Branded Pack',
+};

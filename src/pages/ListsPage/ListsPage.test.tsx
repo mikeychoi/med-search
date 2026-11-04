@@ -6,6 +6,7 @@ import {
   createList,
   deleteList,
   getLists,
+  removeMedication,
 } from '../../services/medicationLists';
 import type { MedicationList } from '../../types/medication';
 import ListsPage from './ListsPage';
@@ -16,11 +17,13 @@ vi.mock('../../services/medicationLists', async (importOriginal) => ({
   getLists: vi.fn(),
   createList: vi.fn(),
   deleteList: vi.fn(),
+  removeMedication: vi.fn(),
 }));
 
 const getListsMock = vi.mocked(getLists);
 const createListMock = vi.mocked(createList);
 const deleteListMock = vi.mocked(deleteList);
+const removeMedicationMock = vi.mocked(removeMedication);
 
 const painRelief: MedicationList = {
   id: 'list-1',
@@ -69,6 +72,7 @@ afterEach(() => {
   getListsMock.mockReset();
   createListMock.mockReset();
   deleteListMock.mockReset();
+  removeMedicationMock.mockReset();
 });
 
 describe('ListsPage', () => {
@@ -296,6 +300,68 @@ describe('ListsPage', () => {
 
       expect(listNames()).toEqual(['Travel Kit']);
       expect(screen.getByText('“Pain Relief” had already been deleted.')).toBeInTheDocument();
+    });
+  });
+
+  describe('removing a medication', () => {
+    const [ibuprofen, acetaminophen] = painRelief.medications;
+
+    async function expandPainRelief() {
+      const helpers = setup([painRelief, travelKit]);
+      await helpers.user.click(screen.getByRole('button', { name: /^Pain Relief/ }));
+      return helpers;
+    }
+
+    const medicationsShown = () =>
+      within(screen.getByRole('list', { name: 'Medications in Pain Relief' }))
+        .getAllByRole('button', { name: /^Remove / })
+        .map((button) => button.getAttribute('aria-label'));
+
+    it('shows a list’s medications when its row is expanded', async () => {
+      await expandPainRelief();
+
+      expect(medicationsShown()).toEqual([
+        `Remove ${ibuprofen.name}`,
+        `Remove ${acetaminophen.name}`,
+      ]);
+    });
+
+    it('removes the medication by list ID and RxCUI and updates the list', async () => {
+      removeMedicationMock.mockReturnValue({ ...painRelief, medications: [acetaminophen] });
+      const { user } = await expandPainRelief();
+
+      await user.click(screen.getByRole('button', { name: `Remove ${ibuprofen.name}` }));
+
+      expect(removeMedicationMock).toHaveBeenCalledWith('list-1', ibuprofen.rxcui);
+      expect(medicationsShown()).toEqual([`Remove ${acetaminophen.name}`]);
+      expect(screen.getByText(/^1 medication · Created/)).toBeInTheDocument();
+      expect(
+        screen.getByText(`Removed “${ibuprofen.name}” from “Pain Relief”.`),
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the medication and shows an error when removal fails', async () => {
+      removeMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('storage');
+      });
+      const { user } = await expandPainRelief();
+
+      await user.click(screen.getByRole('button', { name: `Remove ${ibuprofen.name}` }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/couldn’t be saved/);
+      expect(medicationsShown()).toHaveLength(2);
+    });
+
+    it('drops the list and explains when it no longer exists', async () => {
+      removeMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('not-found');
+      });
+      const { user, listNames } = await expandPainRelief();
+
+      await user.click(screen.getByRole('button', { name: `Remove ${ibuprofen.name}` }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('That list no longer exists.');
+      expect(listNames()).toEqual(['Travel Kit']);
     });
   });
 });

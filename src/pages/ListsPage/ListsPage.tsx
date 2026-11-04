@@ -1,34 +1,24 @@
 import { useState } from 'react';
-import Alert, { type AlertColor } from '@mui/material/Alert';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import CreateListDialog from '../../components/CreateListDialog/CreateListDialog';
 import ListsOverview from '../../components/ListsOverview/ListsOverview';
+import NoticeSnackbar from '../../components/NoticeSnackbar/NoticeSnackbar';
 import { useMedicationLists } from '../../hooks/useMedicationLists';
-import type { MedicationList } from '../../types/medication';
-
-interface Notice {
-  severity: AlertColor;
-  message: string;
-  /** Kept separately so the message stays visible while the snackbar animates out. */
-  open: boolean;
-}
+import { useNotice } from '../../hooks/useNotice';
+import type { Medication, MedicationList } from '../../types/medication';
 
 function ListsPage() {
-  const { lists, loadError, create, remove } = useMedicationLists();
+  const { lists, loadError, create, remove, removeMedication } = useMedicationLists();
+  const { notice, notify, closeNotice } = useNotice();
   const [createOpen, setCreateOpen] = useState(false);
   // The list stays set after the dialog closes so its text doesn't blank out mid-animation.
   const [listToDelete, setListToDelete] = useState<MedicationList | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
-
-  const notify = (severity: AlertColor, message: string) =>
-    setNotice({ severity, message, open: true });
-  const closeNotice = () => setNotice((current) => current && { ...current, open: false });
 
   function handleCreate(name: string): string | undefined {
     const result = create(name);
@@ -49,6 +39,15 @@ function ListsPage() {
       notify('info', `“${listToDelete.name}” had already been deleted.`);
     } else {
       notify('success', `Deleted “${listToDelete.name}”.`);
+    }
+  }
+
+  function handleRemoveMedication(list: MedicationList, medication: Medication) {
+    const result = removeMedication(list.id, medication.rxcui);
+    if (!result.ok) {
+      notify('error', result.message);
+    } else {
+      notify('success', `Removed “${medication.name}” from “${list.name}”.`);
     }
   }
 
@@ -76,7 +75,12 @@ function ListsPage() {
 
       {/* When loading failed, the alert replaces the "no lists yet" empty state. */}
       {(lists.length > 0 || !loadError) && (
-        <ListsOverview lists={lists} onCreate={openCreate} onDelete={requestDelete} />
+        <ListsOverview
+          lists={lists}
+          onCreate={openCreate}
+          onDelete={requestDelete}
+          onRemoveMedication={handleRemoveMedication}
+        />
       )}
 
       <CreateListDialog
@@ -92,22 +96,7 @@ function ListsPage() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmOpen(false)}
       />
-      <Snackbar
-        open={notice?.open ?? false}
-        autoHideDuration={4000}
-        onClose={(_, reason) => reason !== 'clickaway' && closeNotice()}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {/* Snackbar needs a single element child even while closed. */}
-        <Alert
-          severity={notice?.severity ?? 'info'}
-          variant="filled"
-          onClose={closeNotice}
-          sx={{ width: '100%' }}
-        >
-          {notice?.message}
-        </Alert>
-      </Snackbar>
+      <NoticeSnackbar notice={notice} onClose={closeNotice} />
     </Stack>
   );
 }

@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import List from '@mui/material/List';
 import type { MedicationList } from '../../types/medication';
 import ListSummaryRow from './ListSummaryRow';
@@ -19,36 +18,40 @@ const list: MedicationList = {
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(iso));
 
-function renderRow(rowList: MedicationList = list, onDelete = vi.fn()) {
-  render(
-    <MemoryRouter>
-      <List>
-        <ListSummaryRow list={rowList} to="/lists/list-1" onDelete={onDelete} />
-      </List>
-    </MemoryRouter>,
+function renderRow({
+  rowList = list,
+  expanded = false,
+  onToggle = vi.fn(),
+  onDelete = vi.fn(),
+} = {}) {
+  const row = (isExpanded: boolean) => (
+    <List>
+      <ListSummaryRow
+        list={rowList}
+        expanded={isExpanded}
+        onToggle={onToggle}
+        contentsId="contents"
+        onDelete={onDelete}
+      />
+    </List>
   );
-  return onDelete;
+  const { rerender } = render(row(expanded));
+  return { onToggle, onDelete, setExpanded: (value: boolean) => rerender(row(value)) };
 }
 
 describe('ListSummaryRow', () => {
-  it('links the list name to the given route', () => {
-    renderRow();
+  it('is a toggle button that reports presses and reflects the expanded state', async () => {
+    const user = userEvent.setup();
+    const { onToggle, setExpanded } = renderRow();
 
-    expect(screen.getByRole('link', { name: /Pain Relief/ })).toHaveAttribute(
-      'href',
-      '/lists/list-1',
-    );
-  });
+    const toggle = screen.getByRole('button', { name: /^Pain Relief/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'contents');
+    await user.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
 
-  it('renders the name as plain text when no route is given', () => {
-    render(
-      <List>
-        <ListSummaryRow list={list} onDelete={vi.fn()} />
-      </List>,
-    );
-
-    expect(screen.getByText('Pain Relief')).toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    setExpanded(true);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('shows the medication count and created and updated dates', () => {
@@ -62,14 +65,16 @@ describe('ListSummaryRow', () => {
   });
 
   it('uses the singular for one medication and handles invalid dates', () => {
-    renderRow({ ...list, medications: [list.medications[0]], updatedAt: 'not a date' });
+    renderRow({
+      rowList: { ...list, medications: [list.medications[0]], updatedAt: 'not a date' },
+    });
 
     expect(screen.getByText(/^1 medication · /)).toHaveTextContent('Updated Unknown');
   });
 
   it('calls onDelete with the list when the delete button is pressed', async () => {
     const user = userEvent.setup();
-    const onDelete = renderRow();
+    const { onDelete } = renderRow();
 
     await user.click(screen.getByRole('button', { name: 'Delete Pain Relief' }));
 

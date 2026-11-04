@@ -1,15 +1,17 @@
-import type { MedicationList } from '../types/medication';
+import type { Medication, MedicationList } from '../types/medication';
 import {
   LISTS_STORAGE_KEY,
   MedicationListError,
-  clearLists,
+  addMedication,
   createList,
   deleteList,
   getLists,
+  removeMedication,
 } from './medicationLists';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CREATED_AT = '2026-11-03T10:00:00.000Z';
+const LATER = '2026-11-03T12:30:00.000Z';
 
 function storedValue(): unknown {
   const raw = localStorage.getItem(LISTS_STORAGE_KEY);
@@ -140,6 +142,129 @@ describe('deleteList', () => {
   });
 });
 
+describe('addMedication', () => {
+  const tylenol: Medication = {
+    rxcui: '209387',
+    name: 'acetaminophen 325 MG Oral Tablet [Tylenol]',
+    termType: 'SBD',
+    synonym: 'Tylenol 325 MG Oral Tablet',
+  };
+  const ibuprofen: Medication = {
+    rxcui: '310965',
+    name: 'ibuprofen 200 MG Oral Tablet',
+    termType: 'SCD',
+  };
+
+  it('appends the medication, updates updatedAt, and returns the updated list', () => {
+    const list = createList('Pain Relief');
+    vi.setSystemTime(new Date(LATER));
+
+    addMedication(list.id, tylenol);
+    const updated = addMedication(list.id, ibuprofen);
+
+    expect(updated).toEqual({
+      ...list,
+      medications: [tylenol, ibuprofen],
+      createdAt: CREATED_AT,
+      updatedAt: LATER,
+    });
+  });
+
+  it('persists the change so getLists returns it', () => {
+    const list = createList('Pain Relief');
+
+    const updated = addMedication(list.id, tylenol);
+
+    expect(getLists()).toEqual([updated]);
+  });
+
+  it('leaves other lists unchanged', () => {
+    const pain = createList('Pain Relief');
+    const travel = createList('Travel Kit');
+    vi.setSystemTime(new Date(LATER));
+
+    addMedication(pain.id, tylenol);
+
+    expect(getLists()[1]).toEqual(travel);
+  });
+
+  it('allows the same medication in different lists', () => {
+    const pain = createList('Pain Relief');
+    const travel = createList('Travel Kit');
+
+    addMedication(pain.id, tylenol);
+    addMedication(travel.id, tylenol);
+
+    expect(getLists().map((list) => list.medications)).toEqual([[tylenol], [tylenol]]);
+  });
+
+  it('rejects a medication already in the list, matched by RxCUI, without saving', () => {
+    const list = createList('Pain Relief');
+    addMedication(list.id, tylenol);
+    const before = storedValue();
+
+    const error = expectListError(
+      () => addMedication(list.id, { ...tylenol, name: 'Tylenol (renamed)' }),
+      'duplicate-medication',
+    );
+    expect(error.message).toBe('“Tylenol (renamed)” is already in “Pain Relief”.');
+    expect(storedValue()).toEqual(before);
+  });
+
+  it('throws not-found for a nonexistent list', () => {
+    createList('Pain Relief');
+    const before = storedValue();
+
+    expectListError(() => addMedication('missing-id', tylenol), 'not-found');
+    expect(storedValue()).toEqual(before);
+  });
+});
+
+describe('removeMedication', () => {
+  const [advil] = savedList.medications;
+  const ibuprofen: Medication = {
+    rxcui: '310965',
+    name: 'ibuprofen 200 MG Oral Tablet',
+    termType: 'SCD',
+  };
+
+  beforeEach(() => {
+    localStorage.setItem(
+      LISTS_STORAGE_KEY,
+      JSON.stringify([{ ...savedList, medications: [advil, ibuprofen] }]),
+    );
+  });
+
+  it('removes the medication, updates updatedAt, and persists the change', () => {
+    vi.setSystemTime(new Date(LATER));
+
+    const updated = removeMedication(savedList.id, advil.rxcui);
+
+    expect(updated).toEqual({ ...savedList, medications: [ibuprofen], updatedAt: LATER });
+    expect(getLists()).toEqual([updated]);
+  });
+
+  it('can remove the last medication, leaving an empty list', () => {
+    removeMedication(savedList.id, advil.rxcui);
+
+    expect(removeMedication(savedList.id, ibuprofen.rxcui).medications).toEqual([]);
+  });
+
+  it('throws medication-not-found for a medication not in the list', () => {
+    const before = storedValue();
+
+    expectListError(() => removeMedication(savedList.id, '999'), 'medication-not-found');
+    expect(storedValue()).toEqual(before);
+  });
+
+  it('throws not-found for a nonexistent list', () => {
+    const before = storedValue();
+
+    expectListError(() => removeMedication('missing-id', advil.rxcui), 'not-found');
+    expect(storedValue()).toEqual(before);
+  });
+});
+
 describe('invalid stored data', () => {
   it('throws invalid-data for unreadable JSON', () => {
     localStorage.setItem(LISTS_STORAGE_KEY, '{not json');
@@ -205,15 +330,6 @@ describe('invalid stored data', () => {
       { rxcui: '2', name: 'ok', termType: 'SCD', synonym: undefined, prescribableName: undefined },
     ]);
   });
-
-  it('clearLists removes saved data so lists can be used again', () => {
-    localStorage.setItem(LISTS_STORAGE_KEY, '{not json');
-
-    clearLists();
-
-    expect(getLists()).toEqual([]);
-    expect(createList('Pain Relief').name).toBe('Pain Relief');
-  });
 });
 
 describe('storage errors', () => {
@@ -237,13 +353,5 @@ describe('storage errors', () => {
     const error = expectListError(() => createList('Pain Relief'), 'storage');
     expect(error.cause).toBe(cause);
     expect(error.message).toMatch(/couldn’t be saved/);
-  });
-
-  it('throws a storage error when clearing fails', () => {
-    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
-      throw new DOMException('The operation is insecure.', 'SecurityError');
-    });
-
-    expectListError(() => clearLists(), 'storage');
   });
 });

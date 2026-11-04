@@ -1,6 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
-import { MedicationListError, createList, deleteList, getLists } from '../services/medicationLists';
-import type { MedicationList } from '../types/medication';
+import {
+  MedicationListError,
+  addMedication,
+  createList,
+  deleteList,
+  getLists,
+  removeMedication,
+} from '../services/medicationLists';
+import type { Medication, MedicationList } from '../types/medication';
 import { useMedicationLists } from './useMedicationLists';
 
 // Replace the service functions; keep the real MedicationListError for instanceof checks.
@@ -9,11 +16,21 @@ vi.mock('../services/medicationLists', async (importOriginal) => ({
   getLists: vi.fn(),
   createList: vi.fn(),
   deleteList: vi.fn(),
+  addMedication: vi.fn(),
+  removeMedication: vi.fn(),
 }));
 
 const getListsMock = vi.mocked(getLists);
 const createListMock = vi.mocked(createList);
 const deleteListMock = vi.mocked(deleteList);
+const addMedicationMock = vi.mocked(addMedication);
+const removeMedicationMock = vi.mocked(removeMedication);
+
+const tylenol: Medication = {
+  rxcui: '209387',
+  name: 'acetaminophen 325 MG Oral Tablet [Tylenol]',
+  termType: 'SBD',
+};
 
 const painRelief: MedicationList = {
   id: 'list-1',
@@ -34,6 +51,8 @@ afterEach(() => {
   getListsMock.mockReset();
   createListMock.mockReset();
   deleteListMock.mockReset();
+  addMedicationMock.mockReset();
+  removeMedicationMock.mockReset();
 });
 
 describe('useMedicationLists', () => {
@@ -140,6 +159,96 @@ describe('useMedicationLists', () => {
 
       expect(outcome).toEqual({ ok: false, message: expect.stringMatching(/couldn’t be saved/) });
       expect(result.current.lists).toEqual([painRelief]);
+    });
+  });
+
+  describe('addMedication', () => {
+    it('replaces the list in state with the updated one', () => {
+      const updated = { ...painRelief, medications: [tylenol] };
+      addMedicationMock.mockReturnValue(updated);
+      const { result } = setup([painRelief, travelKit]);
+
+      let outcome!: ReturnType<typeof result.current.addMedication>;
+      act(() => {
+        outcome = result.current.addMedication('list-1', tylenol);
+      });
+
+      expect(addMedicationMock).toHaveBeenCalledWith('list-1', tylenol);
+      expect(outcome).toEqual({ ok: true, list: updated });
+      expect(result.current.lists).toEqual([updated, travelKit]);
+    });
+
+    it('returns the duplicate message and leaves state unchanged', () => {
+      addMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('duplicate-medication', { message: 'Already in list.' });
+      });
+      const { result } = setup();
+
+      expect(result.current.addMedication('list-1', tylenol)).toEqual({
+        ok: false,
+        message: 'Already in list.',
+      });
+      expect(result.current.lists).toEqual([painRelief]);
+    });
+
+    it('drops a list that no longer exists in storage', () => {
+      addMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('not-found');
+      });
+      const { result } = setup([painRelief, travelKit]);
+
+      let outcome!: ReturnType<typeof result.current.addMedication>;
+      act(() => {
+        outcome = result.current.addMedication('list-1', tylenol);
+      });
+
+      expect(outcome).toEqual({ ok: false, message: 'That list no longer exists.' });
+      expect(result.current.lists).toEqual([travelKit]);
+    });
+  });
+
+  describe('removeMedication', () => {
+    const withTylenol = { ...painRelief, medications: [tylenol] };
+
+    it('replaces the list in state with the updated one', () => {
+      removeMedicationMock.mockReturnValue(painRelief);
+      const { result } = setup([withTylenol]);
+
+      let outcome!: ReturnType<typeof result.current.removeMedication>;
+      act(() => {
+        outcome = result.current.removeMedication('list-1', tylenol.rxcui);
+      });
+
+      expect(removeMedicationMock).toHaveBeenCalledWith('list-1', tylenol.rxcui);
+      expect(outcome).toEqual({ ok: true });
+      expect(result.current.lists).toEqual([painRelief]);
+    });
+
+    it('treats a medication missing from storage as removed', () => {
+      removeMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('medication-not-found');
+      });
+      const { result } = setup([withTylenol]);
+
+      let outcome!: ReturnType<typeof result.current.removeMedication>;
+      act(() => {
+        outcome = result.current.removeMedication('list-1', tylenol.rxcui);
+      });
+
+      expect(outcome).toEqual({ ok: true });
+      expect(result.current.lists[0].medications).toEqual([]);
+    });
+
+    it('returns the message and keeps the medication on other failures', () => {
+      removeMedicationMock.mockImplementation(() => {
+        throw new MedicationListError('storage');
+      });
+      const { result } = setup([withTylenol]);
+
+      const outcome = result.current.removeMedication('list-1', tylenol.rxcui);
+
+      expect(outcome).toEqual({ ok: false, message: expect.stringMatching(/couldn’t be saved/) });
+      expect(result.current.lists).toEqual([withTylenol]);
     });
   });
 });

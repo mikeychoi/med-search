@@ -3,12 +3,20 @@ import { RXNORM_TERM_TYPES, type Medication, type MedicationList } from '../type
 export const LISTS_STORAGE_KEY = 'medsearch:lists';
 
 export type MedicationListErrorKind =
-  'invalid-name' | 'duplicate-name' | 'not-found' | 'invalid-data' | 'storage';
+  | 'invalid-name'
+  | 'duplicate-name'
+  | 'not-found'
+  | 'duplicate-medication'
+  | 'medication-not-found'
+  | 'invalid-data'
+  | 'storage';
 
 const ERROR_MESSAGES: Record<MedicationListErrorKind, string> = {
   'invalid-name': 'Enter a name for the list.',
   'duplicate-name': 'A list with that name already exists.',
   'not-found': 'That list no longer exists.',
+  'duplicate-medication': 'That medication is already in this list.',
+  'medication-not-found': 'That medication is no longer in this list.',
   'invalid-data': 'Your saved lists couldn’t be read.',
   storage: 'Your lists couldn’t be saved. Check your browser’s storage settings.',
 };
@@ -60,13 +68,51 @@ export function deleteList(id: string): void {
   writeLists(remaining);
 }
 
-/** Removes all saved lists, e.g. to recover from unreadable stored data. */
-export function clearLists(): void {
-  try {
-    localStorage.removeItem(LISTS_STORAGE_KEY);
-  } catch (error) {
-    throw new MedicationListError('storage', { cause: error });
+/** Adds a medication to the end of a list and returns the updated list. */
+export function addMedication(listId: string, medication: Medication): MedicationList {
+  return updateList(listId, (list) => {
+    if (list.medications.some((m) => m.rxcui === medication.rxcui)) {
+      throw new MedicationListError('duplicate-medication', {
+        message: `“${medication.name}” is already in “${list.name}”.`,
+      });
+    }
+    return [...list.medications, medication];
+  });
+}
+
+/** Removes the medication with the given RxCUI from a list and returns the updated list. */
+export function removeMedication(listId: string, rxcui: string): MedicationList {
+  return updateList(listId, (list) => {
+    const remaining = list.medications.filter((m) => m.rxcui !== rxcui);
+    if (remaining.length === list.medications.length) {
+      throw new MedicationListError('medication-not-found');
+    }
+    return remaining;
+  });
+}
+
+/**
+ * Replaces one list's medications with the result of `change`, bumps its `updatedAt`, saves,
+ * and returns the updated list. Throws `not-found` if no list has the given ID.
+ */
+function updateList(
+  listId: string,
+  change: (list: MedicationList) => Medication[],
+): MedicationList {
+  const lists = readLists();
+  const index = lists.findIndex((list) => list.id === listId);
+  if (index === -1) {
+    throw new MedicationListError('not-found');
   }
+
+  const current = lists[index];
+  const updated: MedicationList = {
+    ...current,
+    medications: change(current),
+    updatedAt: new Date().toISOString(),
+  };
+  writeLists(lists.map((list, i) => (i === index ? updated : list)));
+  return updated;
 }
 
 // --- Validation -------------------------------------------------------------

@@ -82,6 +82,7 @@ Data Management
 
     - Avoid duplicating code logic across repo, design elements should be sorted into nested React components
     - MUI elements should be used whenever possible with a simple standardized theme (font, color, sizing)
+    - Check to ensure that imported elements are not deprecated and are up to par with the current standard
 
 
 5. API Integration Guidelines

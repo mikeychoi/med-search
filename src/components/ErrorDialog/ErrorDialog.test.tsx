@@ -12,19 +12,10 @@ describe('ErrorDialog', () => {
     expect(dialog).toHaveAccessibleDescription(message);
   });
 
-  it('supports a custom title and dismiss label', () => {
-    render(
-      <ErrorDialog
-        open
-        title="Search unavailable"
-        message={message}
-        dismissLabel="Close"
-        onClose={vi.fn()}
-      />,
-    );
+  it('supports a custom title', () => {
+    render(<ErrorDialog open title="Search unavailable" message={message} onClose={vi.fn()} />);
 
     expect(screen.getByRole('dialog', { name: 'Search unavailable' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
   it('calls onClose when dismissed', async () => {

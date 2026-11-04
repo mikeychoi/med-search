@@ -2,8 +2,9 @@ import type { MockInstance } from 'vitest';
 import type { RxNormDrugsResponse } from '../types/rxnorm';
 import { RxNormError, searchMedications, toMedications } from './rxnorm';
 
-// Trimmed from real responses to /REST/drugs.json?name=ibuprofen&expand=psn.
-// Groups arrive in RxNorm's order (packs first), and empty groups have no conceptProperties.
+// Trimmed from a real response to /REST/drugs.json?name=ibuprofen&expand=psn (verified
+// 2026-11-03): two of the SBD and SCD concepts each, in RxNorm's order. Groups arrive with packs
+// first, and empty groups have no conceptProperties.
 const ibuprofenResponse: RxNormDrugsResponse = {
   drugGroup: {
     name: null,
@@ -14,7 +15,17 @@ const ibuprofenResponse: RxNormDrugsResponse = {
         tty: 'SBD',
         conceptProperties: [
           {
-            rxcui: '1100066',
+            rxcui: '201126',
+            name: 'ibuprofen 200 MG Oral Tablet [Motrin]',
+            synonym: 'Motrin 200 MG Oral Tablet',
+            tty: 'SBD',
+            language: 'ENG',
+            suppress: 'N',
+            umlscui: '',
+            psn: 'Motrin IB 200 MG Oral Tablet',
+          },
+          {
+            rxcui: '731533',
             name: 'ibuprofen 200 MG Oral Capsule [Advil]',
             synonym: 'Advil 200 MG Oral Capsule',
             tty: 'SBD',
@@ -23,31 +34,11 @@ const ibuprofenResponse: RxNormDrugsResponse = {
             umlscui: '',
             psn: 'Advil 200 MG Oral Capsule',
           },
-          {
-            rxcui: '153008',
-            name: 'ibuprofen 200 MG Oral Tablet [Motrin]',
-            synonym: 'Motrin 200 MG Oral Tablet',
-            tty: 'SBD',
-            language: 'ENG',
-            suppress: 'N',
-            umlscui: '',
-            psn: 'Motrin 200 MG Oral Tablet',
-          },
         ],
       },
       {
         tty: 'SCD',
         conceptProperties: [
-          {
-            rxcui: '310965',
-            name: 'ibuprofen 200 MG Oral Tablet',
-            synonym: '',
-            tty: 'SCD',
-            language: 'ENG',
-            suppress: 'N',
-            umlscui: '',
-            psn: 'ibuprofen 200 MG Oral Tablet',
-          },
           {
             rxcui: '197805',
             name: 'ibuprofen 400 MG Oral Tablet',
@@ -56,6 +47,17 @@ const ibuprofenResponse: RxNormDrugsResponse = {
             language: 'ENG',
             suppress: 'N',
             umlscui: '',
+            psn: 'ibuprofen 400 MG Oral Tablet',
+          },
+          {
+            rxcui: '310965',
+            name: 'ibuprofen 200 MG Oral Tablet',
+            synonym: 'ibuprofen 200 MG (as ibuprofen sodium 256 MG) Oral Tablet',
+            tty: 'SCD',
+            language: 'ENG',
+            suppress: 'N',
+            umlscui: '',
+            psn: 'ibuprofen 200 MG Oral Tablet',
           },
         ],
       },
@@ -118,10 +120,10 @@ describe('searchMedications', () => {
       const medications = await searchMedications('ibuprofen');
 
       expect(medications.map((m) => [m.rxcui, m.termType])).toEqual([
-        ['310965', 'SCD'],
         ['197805', 'SCD'],
-        ['1100066', 'SBD'],
-        ['153008', 'SBD'],
+        ['310965', 'SCD'],
+        ['201126', 'SBD'],
+        ['731533', 'SBD'],
       ]);
     });
 
@@ -131,23 +133,25 @@ describe('searchMedications', () => {
       const medications = await searchMedications('ibuprofen');
 
       expect(medications[2]).toEqual({
-        rxcui: '1100066',
-        name: 'ibuprofen 200 MG Oral Capsule [Advil]',
+        rxcui: '201126',
+        name: 'ibuprofen 200 MG Oral Tablet [Motrin]',
         termType: 'SBD',
-        synonym: 'Advil 200 MG Oral Capsule',
-        prescribableName: 'Advil 200 MG Oral Capsule',
+        synonym: 'Motrin 200 MG Oral Tablet',
+        prescribableName: 'Motrin IB 200 MG Oral Tablet',
       });
     });
 
     it('leaves missing or empty optional fields undefined', async () => {
-      fetchMock.mockResolvedValue(jsonResponse(ibuprofenResponse));
+      // RxNorm sends an empty synonym as "", and psn can be missing entirely.
+      fetchMock.mockResolvedValue(
+        jsonResponse(responseWith([concept({ rxcui: '197805', synonym: '', psn: undefined })])),
+      );
 
       const medications = await searchMedications('ibuprofen');
 
-      // synonym is "" and psn is absent in the raw response.
-      expect(medications[1]).toEqual({
+      expect(medications[0]).toEqual({
         rxcui: '197805',
-        name: 'ibuprofen 400 MG Oral Tablet',
+        name: 'drug',
         termType: 'SCD',
         synonym: undefined,
         prescribableName: undefined,

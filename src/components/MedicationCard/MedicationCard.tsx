@@ -10,9 +10,8 @@ import { RXNORM_TERM_TYPE_LABELS, type Medication } from '../../types/medication
 
 interface MedicationCardProps {
   medication: Medication;
-  /** Called with this card's medication when the action button is pressed. */
+  /** Called with this card's medication when the add button is pressed. */
   onAdd: (medication: Medication) => void;
-  actionLabel?: string;
 }
 
 /** The first alternate name that adds information beyond the medication's name. */
@@ -20,7 +19,7 @@ function getAlternateName({ name, prescribableName, synonym }: Medication) {
   return [prescribableName, synonym].find((alt) => alt && alt !== name);
 }
 
-function MedicationCard({ medication, onAdd, actionLabel = 'Add to list' }: MedicationCardProps) {
+function MedicationCard({ medication, onAdd }: MedicationCardProps) {
   const alternateName = getAlternateName(medication);
 
   return (
@@ -49,9 +48,9 @@ function MedicationCard({ medication, onAdd, actionLabel = 'Add to list' }: Medi
           variant="outlined"
           startIcon={<AddIcon />}
           onClick={() => onAdd(medication)}
-          aria-label={`${actionLabel}: ${medication.name}`}
+          aria-label={`Add to list: ${medication.name}`}
         >
-          {actionLabel}
+          Add to list
         </Button>
       </CardActions>
     </Card>

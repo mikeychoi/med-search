@@ -14,16 +14,9 @@ interface ErrorDialogProps {
   /** Called when the user dismisses the dialog (button, Esc, or backdrop click). */
   onClose: () => void;
   title?: string;
-  dismissLabel?: string;
 }
 
-function ErrorDialog({
-  open,
-  message,
-  onClose,
-  title = 'Something went wrong',
-  dismissLabel = 'OK',
-}: ErrorDialogProps) {
+function ErrorDialog({ open, message, onClose, title = 'Something went wrong' }: ErrorDialogProps) {
   const titleId = useId();
   const messageId = useId();
 
@@ -45,7 +38,7 @@ function ErrorDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button variant="contained" onClick={onClose} autoFocus>
-          {dismissLabel}
+          OK
         </Button>
       </DialogActions>
     </Dialog>

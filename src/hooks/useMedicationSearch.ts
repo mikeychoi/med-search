@@ -48,7 +48,6 @@ export function useMedicationSearch() {
     medications,
     error,
     isLoading: status === 'loading',
-    hasSearched: status !== 'idle',
     search,
     clearError,
   };

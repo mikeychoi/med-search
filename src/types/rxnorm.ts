@@ -1,6 +1,6 @@
 // Raw response shapes from the RxNorm REST API (https://lhncbc.nlm.nih.gov/RxNav/APIs/RxNormAPIs.html).
 
-/** One concept, as returned by /drugs.json and /rxcui/{rxcui}/properties.json. */
+/** One concept, as returned by /drugs.json. */
 export interface RxNormConceptProperties {
   rxcui?: string;
   name?: string;
@@ -31,9 +31,4 @@ export interface RxNormDrugGroup {
 /** GET /REST/drugs.json?name={name}&expand=psn */
 export interface RxNormDrugsResponse {
   drugGroup?: RxNormDrugGroup | null;
-}
-
-/** GET /REST/rxcui/{rxcui}/properties.json — `{}` for an unknown RxCUI. */
-export interface RxNormPropertiesResponse {
-  properties?: RxNormConceptProperties | null;
 }

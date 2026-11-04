@@ -62,12 +62,4 @@ describe('MedicationCard', () => {
 
     expect(onAdd).toHaveBeenCalledWith(tylenol);
   });
-
-  it('supports a custom action label', () => {
-    render(<MedicationCard medication={tylenol} onAdd={vi.fn()} actionLabel="Select" />);
-
-    expect(screen.getByRole('button', { name: `Select: ${tylenol.name}` })).toHaveTextContent(
-      'Select',
-    );
-  });
 });

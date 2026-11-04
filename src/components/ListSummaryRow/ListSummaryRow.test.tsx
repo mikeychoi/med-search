@@ -40,6 +40,17 @@ describe('ListSummaryRow', () => {
     );
   });
 
+  it('renders the name as plain text when no route is given', () => {
+    render(
+      <List>
+        <ListSummaryRow list={list} onDelete={vi.fn()} />
+      </List>,
+    );
+
+    expect(screen.getByText('Pain Relief')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('shows the medication count and created and updated dates', () => {
     renderRow();
 

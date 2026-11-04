@@ -9,8 +9,8 @@ import type { MedicationList } from '../../types/medication';
 
 interface ListSummaryRowProps {
   list: MedicationList;
-  /** Route the list name links to. */
-  to: string;
+  /** Route the list name links to. Without it, the row is not a link. */
+  to?: string;
   /** Called with this row's list when the delete button is pressed. */
   onDelete: (list: MedicationList) => void;
 }
@@ -30,10 +30,18 @@ function ListSummaryRow({ list, to, onDelete }: ListSummaryRowProps) {
     `Updated ${formatDate(list.updatedAt)}`,
   ].join(' · ');
 
+  const text = (
+    <ListItemText
+      primary={list.name}
+      secondary={details}
+      slotProps={{ primary: { sx: { fontWeight: 600 } } }}
+    />
+  );
+
   return (
     <ListItem
       divider
-      disablePadding
+      disablePadding={to !== undefined}
       secondaryAction={
         <Tooltip title="Delete list">
           <IconButton edge="end" aria-label={`Delete ${list.name}`} onClick={() => onDelete(list)}>
@@ -42,13 +50,13 @@ function ListSummaryRow({ list, to, onDelete }: ListSummaryRowProps) {
         </Tooltip>
       }
     >
-      <ListItemButton component={RouterLink} to={to}>
-        <ListItemText
-          primary={list.name}
-          secondary={details}
-          slotProps={{ primary: { sx: { fontWeight: 600 } } }}
-        />
-      </ListItemButton>
+      {to === undefined ? (
+        text
+      ) : (
+        <ListItemButton component={RouterLink} to={to}>
+          {text}
+        </ListItemButton>
+      )}
     </ListItem>
   );
 }
